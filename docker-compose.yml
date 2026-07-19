@@ -1,36 +1,45 @@
 services:
-  # Servicio de Prometheus
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v2.53.0
     container_name: prometheus
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus_data:/prometheus
     ports:
-      - "9091:9091"
+      - "9091:9090"
     networks:
       - monitoring
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:9090/-/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
-  # Servicio de Grafana
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:11.0.0
     container_name: grafana
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=${GF_ADMIN_PASSWORD:-strong-admin-pass}  # Contraseña de administrador de Grafana
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_ADMIN_PASSWORD:?GF_ADMIN_PASSWORD is required}
     volumes:
       - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
       - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
     ports:
       - "3000:3000"
     depends_on:
-      - prometheus
-      - loki
+      prometheus: { condition: service_healthy }
+      loki: { condition: service_healthy }
     networks:
       - monitoring
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
-  # Servicio de Loki
   loki:
-    image: grafana/loki:latest
+    image: grafana/loki:3.0.0
     container_name: loki
     volumes:
       - ./loki/loki-config.yaml:/etc/loki/loki-config.yaml
@@ -39,22 +48,27 @@ services:
       - "3100:3100"
     networks:
       - monitoring
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:3100/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
-  # Servicio de Promtail
   promtail:
-    image: grafana/promtail:latest
+    image: grafana/promtail:3.0.0
     container_name: promtail
     volumes:
-      - ./promtail/promtail-config.yaml:/etc/promtail/promtail-config.yaml  # Configuración de Promtail
-      - /var/log:/var/log  # Montar los logs del host dentro del contenedor
+      - ./promtail/promtail-config.yaml:/etc/promtail/promtail-config.yaml
+      - /var/log:/var/log
     depends_on:
-      - loki  # Loki debe estar en funcionamiento antes de que Promtail empuje los logs
+      loki: { condition: service_healthy }
     networks:
       - monitoring
+    restart: unless-stopped
 
-  # Servicio de Alertmanager
   alertmanager:
-    image: prom/alertmanager:latest
+    image: prom/alertmanager:v0.27.0
     container_name: alertmanager
     volumes:
       - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
@@ -62,39 +76,42 @@ services:
       - "9093:9093"
     networks:
       - monitoring
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:9093/-/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
-    
   node-exporter:
-    image: prom/node-exporter:latest
+    image: prom/node-exporter:v1.8.1
     container_name: node-exporter
     ports:
       - "9100:9100"
     networks:
       - monitoring
-    restart: always
+    restart: unless-stopped
 
   blackbox-exporter:
-    image: prom/blackbox-exporter:latest
+    image: prom/blackbox-exporter:v0.25.0
     container_name: blackbox-exporter
     ports:
       - "9115:9115"
     networks:
       - monitoring
-    restart: always
+    restart: unless-stopped
 
   cadvisor:
-    image: google/cadvisor:latest
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
     container_name: cadvisor
     ports:
       - "8080:8080"
     networks:
       - monitoring
-    restart: always
+    restart: unless-stopped
     volumes:
-      - /sys:/sys:ro  # Monta /sys del host en el contenedor (necesario para acceder a métricas del sistema)
-
-
-
+      - /sys:/sys:ro
+      - /var/run:/var/run:ro
 
 networks:
   monitoring:
