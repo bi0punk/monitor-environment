@@ -3,7 +3,7 @@
 Full observability and monitoring stack deployed via Docker Compose. Collects system metrics, logs, container stats, and endpoint health checks with dashboards and alerting.
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![CI](https://github.com/tu-usuario/monitor-environment/actions/workflows/ci.yml/badge.svg)](https://github.com/tu-usuario/monitor-environment/actions/workflows/ci.yml)
+[![CI](https://github.com/bi0punk/monitor-environment/actions/workflows/ci.yml/badge.svg)](https://github.com/bi0punk/monitor-environment/actions/workflows/ci.yml)
 
 ## Tabla de Contenidos
 
@@ -76,7 +76,7 @@ monitor-environment/
 ## Instalación
 
 ```bash
-git clone https://github.com/tu-usuario/monitor-environment.git
+git clone https://github.com/bi0punk/monitor-environment.git
 cd monitor-environment
 bash init.sh
 ```
