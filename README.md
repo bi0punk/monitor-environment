@@ -1,38 +1,61 @@
 # monitor-environment
 
-Full observability and monitoring stack deployed via Docker Compose. Collects system metrics, logs, container stats, and endpoint health checks with dashboards and alerting.
+Stack completo de observabilidad y monitoreo desplegado con Docker Compose. Recopila métricas del sistema, logs, estadísticas de contenedores y health checks de endpoints, con dashboards y alertas.
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![CI](https://github.com/bi0punk/monitor-environment/actions/workflows/ci.yml/badge.svg)](https://github.com/bi0punk/monitor-environment/actions/workflows/ci.yml)
 
-## Tabla de Contenidos
+## Contenido
 
 - [Características](#características)
-- [Stack](#stack)
 - [Arquitectura](#arquitectura)
-- [Requisitos](#requisitos)
+- [Stack](#stack)
+- [Estructura del repositorio](#estructura-del-repositorio)
 - [Instalación](#instalación)
 - [Uso](#uso)
-- [Tests](#tests)
 - [Configuración](#configuración)
-- [CI](#ci)
-- [Limitaciones / Roadmap](#limitaciones--roadmap)
+- [Tests / CI](#tests--ci)
+- [Roadmap](#roadmap)
 - [Licencia](#licencia)
 
 ## Características
 
-- Métricas de host con Node Exporter y cAdvisor
-- Dashboards auto-aprovisionados en Grafana
-- Agregación de logs con Loki + Promtail
-- Alertas configurables con Alertmanager
-- Health checks de endpoints con Blackbox Exporter
-- Stack completamente orquestado con Docker Compose
+- Métricas de host con Node Exporter y cAdvisor.
+- Dashboards auto-aprovisionados en Grafana.
+- Agregación de logs con Loki + Promtail.
+- Alertas configurables con Alertmanager.
+- Health checks de endpoints con Blackbox Exporter.
+- Stack completamente orquestado con Docker Compose.
+
+## Arquitectura
+
+```mermaid
+flowchart TD
+    NODE[Node Exporter<br/>:9100 - métricas del host] -->|scrape| PROM[Prometheus<br/>:9091 host / :9090 cont]
+    CAD[cAdvisor<br/>:8080 - métricas de contenedores] -->|scrape| PROM
+    BLACK[Blackbox Exporter<br/>:9115 - health checks] -->|scrape| PROM
+    LOGS[/var/log] -->|push| PROMTAIL[Promtail<br/>:9080]
+    PROMTAIL -->|logs| LOKI[Loki<br/>:3100]
+    PROM -->|alertas| ALERT[Alertmanager<br/>:9093]
+    PROM -->|datasource| GRAF[Grafana<br/>:3000]
+    LOKI -->|datasource| GRAF
+    ALERT -->|receiver null/email| OUT[notificaciones]
+```
 
 ## Stack
 
-Docker Compose, Prometheus, Grafana, Loki, Promtail, Alertmanager, cAdvisor, Node Exporter, Blackbox Exporter
+| Servicio | Puerto (host) | Descripción |
+|----------|---------------|-------------|
+| Prometheus | 9091 | Métricas (contenedor: 9090) |
+| Grafana | 3000 | Dashboards |
+| Loki | 3100 | Logs |
+| Promtail | — | Log shipping |
+| Alertmanager | 9093 | Alertas |
+| cAdvisor | 8080 | Métricas de contenedores |
+| Node Exporter | 9100 | Métricas del host |
+| Blackbox Exporter | 9115 | Health checks |
 
-## Arquitectura
+## Estructura del repositorio
 
 ```
 monitor-environment/
@@ -40,8 +63,8 @@ monitor-environment/
 │   └── prometheus.yml
 ├── grafana/
 │   └── provisioning/
-│       ├── datasources/
-│       └── dashboards/
+│       ├── datasources/datasource.yml
+│       └── dashboards/dashboard.yml
 ├── loki/
 │   └── loki-config.yaml
 ├── promtail/
@@ -50,30 +73,14 @@ monitor-environment/
 │   └── alertmanager.yml
 ├── docker-compose.yml
 ├── init.sh
-├── tests/
+├── tests/test_smoke.py
 ├── .env.example
-└── README.md
+└── LICENSE
 ```
 
-## Servicios
-
-| Servicio         | Puerto | Descripción                |
-|------------------|--------|----------------------------|
-| Prometheus       | 9090   | Métricas                   |
-| Grafana          | 3000   | Dashboards                 |
-| Loki             | 3100   | Logs                       |
-| Promtail         | —      | Log shipping               |
-| Alertmanager     | 9093   | Alertas                    |
-| cAdvisor         | 8080   | Métricas de contenedores   |
-| Node Exporter    | 9100   | Métricas del host          |
-| Blackbox Exporter| 9115   | Health checks              |
-
-## Requisitos
-
-- Docker Engine 24+
-- Docker Compose v2
-
 ## Instalación
+
+Requisitos: Docker Engine 24+ y Docker Compose v2.
 
 ```bash
 git clone https://github.com/bi0punk/monitor-environment.git
@@ -97,34 +104,37 @@ docker compose logs -f
 docker compose down
 ```
 
-Acceder a Grafana en `http://localhost:3000` (admin / strong-admin-pass) con dashboards pre-configurados.
-
-## Tests
-
-```bash
-docker compose config  # validar sintaxis de compose
-pip install pytest ruff && pytest -q  # tests unitarios (si existen)
-```
+Acceder a Grafana en `http://localhost:3000` con el password definido en `GF_ADMIN_PASSWORD` (ver Configuración), con dashboards y datasources pre-configurados.
 
 ## Configuración
 
 Variables de entorno (ver `.env.example`):
 
-| Variable             | Default           | Descripción                     |
-|----------------------|-------------------|---------------------------------|
-| `GF_ADMIN_PASSWORD`  | `strong-admin-pass` | Password admin de Grafana     |
+| Variable             | Default             | Descripción                    |
+|----------------------|---------------------|--------------------------------|
+| `GF_ADMIN_PASSWORD`  | (obligatoria)       | Password admin de Grafana (`:?` exige que esté definida) |
 
-## CI
+El script `init.sh` genera los archivos de configuración por defecto: `prometheus.yml`, `grafana/provisioning/*`, `loki-config.yaml`, `promtail-config.yaml` y `alertmanager.yml`.
 
-GitHub Actions ejecuta validación de sintaxis y lint en cada push y PR.
+## Tests / CI
 
-## Limitaciones / Roadmap
+```bash
+docker compose config  # validar sintaxis de compose
+pip install pytest ruff && pytest -q  # tests unitarios
+```
 
-- [ ] Auto-descubrimiento de servicios via Docker labels
-- [ ] Alertas por Slack/Email pre-configuradas
-- [ ] Exportación de dashboards como JSON
-- [ ] TLS/SSL para servicios expuestos
+CI — GitHub Actions (`.github/workflows/ci.yml`) sobre Python 3.11 con `uv`, en cada push y PR:
+
+- `ruff check .`.
+- `pytest -q`.
+
+## Roadmap
+
+- [ ] Auto-descubrimiento de servicios via Docker labels.
+- [ ] Alertas por Slack/Email pre-configuradas.
+- [ ] Exportación de dashboards como JSON.
+- [ ] TLS/SSL para servicios expuestos.
 
 ## Licencia
 
-MIT
+MIT — ver [LICENSE](LICENSE).
